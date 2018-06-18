@@ -1,0 +1,38 @@
+	Manual para Utilização e Configuração do Script de backup do SPED.
+
+	Visão Geral
+
+	O script automatiza todos os passos necessários para parar os serviços, executar as rotinas de backup do diretório do webapps, da base de dados do LDAP e da bse de dados PostGreSQL, reiniciar os serviços, pra tornar o sistema disponível novamente, e, em caso de sucesso nos backups, copir os arquivos para um servidor remoto, conforme configurado no script.
+
+	Processo
+
+	Ao iniciar, o script tenta parar todos os serviços, e verifica se os mesmos realmente pararam. Caso haja algum ainda em execução, tentará reiniciar os serviços e encerrará imediatamente o backup, saindo com um estado de erro. Somente se os serviços foram parados ele irá prosseguir com o backup.
+	Após isso, realizará os backups:
+	O backup do webapps consiste em uma cópia no formato '.tar.gz' do diretório contendo o código das aplicações.
+	O backup do LDAP é um 'dump' da base de dados do SLAPD.
+	O backup do PostGreSQL é um dump da base de dados 'spedDB'.
+	Nesse momento, independente do sucesso dos backups, ele irá reiniciar os serviços do SPED.
+	Após isso, ele tentará copiar os arquivos via 'scp' para o servidor remoto. Somente serão copiados os arquivos que foram criados com sucesso.
+	Somente se não houve nenhum erro até agora, o script irá remover os backups antigos do computador local, deixando apenas os arquivos resultantes do backup atual. Se houve qualquer erro durante o backup, os arquivos não serão removidos, para que o administrador possa sanar o problema manualmente, sem perder o backup atual.
+	Ao final, ele vai informar sobre o resultado geral da execução, e copiar o log para o servidor remoto, no mesmo diretório dos arquivos de backup.
+	O estado de saída do script reflete os erros que ocorreram durante sua execução, sendo a soma de todos os códigos dos erros ocorridos, conforme segue:
+	1 - Erro ao criar o dump do PostGreSQL;
+	2 - Erro ao criar a cópia do WebApps;
+	4 - Erro ao criar o dump do SLAPD;
+	8 - Erro ao copiar o dump do PostGreSQL para o servidor remoto;
+	16 - Erro ao enviar a cópia do WebApps para o servidor remoto;
+	32 - Erro ao copiar o dump do SLAPD para o servidor remoto;
+	64 - Erro ao interromper os serviços do SPED;
+	128 - O diretório no servidor remoto não está acessível;
+	256 - Não foi possível remover os backups antigos;
+
+	Configuração
+
+	A configuração do script é feita nas variáveis definidas no começo do mesmo, da seguinte maneira:
+DIR_LOCAL - Caminho para o diretório local onde será salvo o backup.
+HOST_REMOTO - Usuário e host para o acesso ao servidor remoto. Utilize sempre o padrão 'usuario@host', onde host pode ser um endereço ip ou um hostname. No caso de realizar o backup não assistido, lembrar de configurar o acesso ssh entre as máquinas com chaves criptográficas, ou o script irá parar devido à falta da senha.
+DIR_REMOTO - Caminho para o diretório onde os arquivos serão copiados para o servidor remoto.
+DATA - Formato da data, que constitui parte do nome dos arquivos de backup.
+ARQUIVO_* - Formato a ser usado no nome do arquivo de backup de cada parte do sistema e do log de execução.
+
+	Ao editar as configurações, lembrar de não utilizar espaços não 'expandidos' nos valores, usar caminhos completos para os diretórios, sem barras no final, e não usar espaços entre o sinal de igual e os nomes e valores. Se não sabe o que é 'expansão' num shell script, não use espaços em valor algum.

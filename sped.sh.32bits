@@ -1,0 +1,119 @@
+#!/bin/bash
+#########################################################################
+# Script para operar os servicos do SPED, contornado o bug de		#
+# inicialização dos mesmos, se necessário.				#
+#	Versão 1.1							#
+# 									#
+# Escrito por Hugo Conrado de Carvalho - 3o Sgt, em 10/08/2015.		#
+# Modificado por Hugo Conrado de Carvalho - 3º Sgt, em 27/08/2015.	#
+#	-Incluída uma espera de 5 segundos após a modificação da data	#
+#		antes de iniciar o tomcat. Após extensivos testes, este	#
+#		atraso mostrou-se fundamental para o funcionamento do 	#
+#		script.							#
+# Modificado por Hugo Conrado de Carvalho - 3º Sgt, em 03/09/2015.	#
+#	- Espera aumentada para 8 segundos.				#
+#	- Retirada a verificação do slapd. Tenta parar o serviço.	#
+#	Contato: hugoconrado777@gmail.com				#
+#########################################################################
+
+
+
+parar_servicos () {
+	# Para os serviços do Tomcat e do LDAP:
+	if /etc/init.d/tomcat stop > /dev/null &> /dev/null;
+	then	echo "O tomcat foi parado."
+	else	echo "Erro ao parar o tomcat."
+	fi
+	sleep 3
+	/etc/init.d/slapd stop
+	sleep 3;
+	# Verifica se os processos foram parados. Retorna 0 se foram parados, 1 se ainda estão em execução.
+	if (ps -A | grep slapd > /dev/null);
+	then	echo "Erro: o slapd continua em execução."
+		return 1
+	else	return 0
+	fi
+}
+
+iniciar_servicos () {
+	#zerar_data
+	sleep 3
+	# Inicia os serviços do tomcat e slapd:
+	echo "Reiniciando os serviços do tomcat e slapd..."
+	/etc/init.d/slapd start
+	/etc/init.d/tomcat start
+	sleep 8
+	#resetar_data
+	# Verifica se os serviços iniciaram normalmente, e retorna de acordo.
+	if (ps -A | grep slapd > /dev/null) && (ps -A | grep apache > /dev/null);
+	then	return 0
+	else	return 1
+	fi
+}
+
+
+#zerar_data () {
+#	# Salva a data atual numa variável, para poder recuperá-la depois:
+#	DATA="`date --rfc-3339=seconds | cut -d ":" -f 1-2`"
+#	export DATA
+#	echo "Salvando a data atual: " $DATA "."
+#	# Muda a data para uma data anterior:
+#	date -s 2014-01-01
+#}
+#
+#resetar_data () {
+#	# Modifica a data novamente para a data salva na variável:
+#	echo "Modificando a data para " $DATA "..."
+#	date -s "$DATA:30"
+#}
+
+case "$1" in
+iniciar)
+	if iniciar_servicos;
+	then	exit 0
+	else	echo "Erro ao iniciar os serviços do SPED."
+		exit 1
+	fi;
+	;;
+parar)
+	if parar_servicos;
+	then	exit 0
+	else	echo "Erro ao parar os serviços do SPED."
+		exit 1
+	fi;
+	;;
+reiniciar)
+	parar_servicos
+	if iniciar_servicos;
+	then	echo "Sped reiniciado com sucesso."
+		exit 0;
+	else	echo "Erro ao reiniciar o Sped."
+		exit 1;
+	fi
+	;;
+estado)
+	# Verifica o estado dos serviços relacionados ao SPED:
+	if (ps -A | grep apache > /dev/null);
+	then	echo "O apache está em execução."
+	else	echo "O apache está parado."
+		exit 1
+	fi
+	if (ps -A | grep slapd > /dev/null);
+	then	echo "O slapd está em execução."
+	else	echo "O slapd está parado."
+		exit 1
+	fi
+	if (ps -A | grep postgres > /dev/null);
+	then	echo "O postgresql está em execução."
+	else	echo "O postgresql está parado."
+		exit 1
+	fi
+	echo "Todos os serviços do SPED estão em execução."
+	exit 0
+	;;
+*)
+	echo "Uso incorreto. sped [iniciar|reiniciar|parar|estado]"
+	echo "Ex.: 'sped iniciar'."
+	exit 1
+	;;
+esac
